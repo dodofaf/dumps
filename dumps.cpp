@@ -137,17 +137,17 @@ uint32_t target = 0xcc8cc000;
 int main(int argc, char **argv) {
     int c;
     
-    bool print_dumps = false;
+    int print_dumps = false;
     
-    char* keys_file = "keys680.txt";
+    char* keys_file = "";
     char* rec_file = "keys.txt";
-    char* dumps_file = "dump680.txt";
+    char* dumps_file = "";
     char* out_file = "dump.txt";
     
-    while ((c = getopt(argc, argv, "vhk:d:K:o:")) != -1) {
+    while ((c = getopt(argc, argv, "v:hk:d:K:o:")) != -1) {
         switch (c) {
             case 'v':
-                print_dumps = true;
+                print_dumps = stoi(optarg);
                 break;
             case 'k':
                 keys_file = optarg;
@@ -162,11 +162,17 @@ int main(int argc, char **argv) {
                 out_file = optarg;
                 break;
             case 'h':
-                printf("Usage: dumps -d dumps_in -o dumps_out -k keys_out -K dictionary -v verbouse\n");
+                printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
+                return 0;
                 break;
             default:
                 break;
         }
+    }
+    
+    if (*keys_file == 0 || *dumps_file == 0) {
+        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
+        return 0;
     }
     
     
@@ -245,6 +251,8 @@ int main(int argc, char **argv) {
         for (int i=0;i<27;++i)
             dump[i] = tmp[i];
         
+        int type;
+        
         if ((dump[5] & 0x88) == 0x08 && (dump[6] & 0x88) == 0x80 &&
             (dump[7] & 0x88) == 0x08 && (dump[8] & 0x88) == 0x80 &&
             (dump[15] & 0x88) == 0x80 &&
@@ -253,6 +261,7 @@ int main(int argc, char **argv) {
             (dump[25] & 0x88) == 0x08 && (dump[26] & 0x88) == 0x80) {
             target = 0xc888c400;
 //            printf("good1\n");
+            type = 1;
         }
 
         if ((dump[5] & 0x88) == 0x80 && (dump[6] & 0x88) == 0x80 &&
@@ -263,6 +272,7 @@ int main(int argc, char **argv) {
             (dump[25] & 0x88) == 0x00 && (dump[26] & 0x88) == 0x08) {
             target = 0xcc8cc000;
 //            printf("good2\n");
+            type = 2;
         }
         
         uint8_t to_decrypt[16];
@@ -273,6 +283,10 @@ int main(int argc, char **argv) {
         
         bool successful_decrypt = false;
         
+        int min_diff = 100;
+        uint8_t min_diff_decrypt[16];
+        vector<uint8_t> best_key;
+        
         for (auto key:keys) {
             uint8_t to_decrypt_cp[16];
             memcpy(to_decrypt_cp, to_decrypt, 16);
@@ -280,14 +294,8 @@ int main(int argc, char **argv) {
             md680_make_key(key, iv);
             md680_decrypt_alg1(to_decrypt_cp, 16);
             
-            if (print_dumps) {
-                for (int i=0;i<16;++i) {
-                    printf("%02X", to_decrypt_cp[i]);
-                }
-                cout<<'\n';
-            }
-            
             int cnt = 0;
+            int diff = 0;
             
             for (int i=0;i<3;i++) {
                 uint32_t v = ((to_decrypt_cp[i*5+0] & 0xcc) << 24) |
@@ -298,7 +306,17 @@ int main(int argc, char **argv) {
                 if (v == target) {
                     ++cnt;
                 }
+                if (print_dumps) {
+                    diff +=  __builtin_popcountl(v^target);
+                }
             }
+            
+            if (print_dumps == 1 and diff < min_diff) {
+                min_diff = diff;
+                memcpy(min_diff_decrypt, to_decrypt_cp, 16);
+                best_key = key;
+            }
+            
             if (cnt == 3) {
                 successful_decrypt = true;
                 
@@ -318,6 +336,21 @@ int main(int argc, char **argv) {
                 }
             }
         }
+        
+        
+        
+        if (print_dumps == 1) {
+            printf("%d ", type);
+            for (int i=0;i<6;++i) {
+                printf("%02X", best_key[i]);
+            }
+            printf(" ");
+            for (int i=0;i<16;++i) {
+                printf("%02X", min_diff_decrypt[i]);
+            }
+            printf(" %d\n", min_diff);
+        }
+        
         if (!successful_decrypt) {
             fprintf(output_file, "%d ", rec.freq);
             

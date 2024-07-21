@@ -1,7 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <string>
-//#include <сstring>
+#include <сstring>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <unistd.h>
@@ -13,6 +14,12 @@ struct Record {
     uint32_t group;
     uint32_t cc;
     vector<uint8_t> key;
+};
+
+struct Stat {
+    Record rec;
+    int cnt;
+    int cnt_suc;
 };
 
 bool record_is_equal(const Record &a, const Record &b)
@@ -144,6 +151,9 @@ int main(int argc, char **argv) {
     char* dumps_file = "";
     char* out_file = "dump.txt";
     
+    bool output_dumps = false;
+    bool output_records = false;
+    
     while ((c = getopt(argc, argv, "v:hk:d:K:o:")) != -1) {
         switch (c) {
             case 'v':
@@ -157,9 +167,11 @@ int main(int argc, char **argv) {
                 break;
             case 'K':
                 rec_file = optarg;
+                output_records = true;
                 break;
             case 'o':
                 out_file = optarg;
+                output_dumps = true;
                 break;
             case 'h':
                 printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
@@ -216,6 +228,9 @@ int main(int argc, char **argv) {
     FILE * output_file = fopen(out_file, "a");
     
     fstream dump_in(dumps_file, dump_in.in);
+    
+    
+    vector<Stat> stats;
     
     int cnt = 0;
     
@@ -323,11 +338,14 @@ int main(int argc, char **argv) {
                 rec.key = key;
                 
                 bool flag = true;
-                for (auto record:records)
-                    if (record_is_equal(rec, record))
+                for (auto record:records) {
+                    if (record_is_equal(rec, record)) {
                         flag = false;
+                        break;
+                    }
+                }
                 
-                if (flag) {
+                if (flag && output_records) {
                     records.push_back(rec);
                     fprintf(records_file, "%d 44 000 %04d %02d ", rec.freq, rec.group, rec.cc);
                     for (auto x:key)
@@ -351,7 +369,28 @@ int main(int argc, char **argv) {
             printf(" %d\n", min_diff);
         }
         
-        if (!successful_decrypt) {
+        
+        bool flag = true;
+        for (auto &stat:stats) {
+            stat.rec.key = rec.key;
+            if (record_is_equal(stat.rec, rec)) {
+                flag = false;
+                if (successful_decrypt)
+                    ++stat.cnt_suc;
+                ++stat.cnt;
+                break;
+            }
+        }
+        
+        if (flag) {
+            Stat stat;
+            stat.rec = rec;
+            stat.cnt = 1;
+            stat.cnt_suc = successful_decrypt;
+            stats.push_back(stat);
+        }
+        
+        if (!successful_decrypt && output_dumps) {
             fprintf(output_file, "%d ", rec.freq);
             
             for (auto x:iv)
@@ -363,6 +402,10 @@ int main(int argc, char **argv) {
                 fprintf(output_file, "%02X", x);
             fprintf(output_file, "\n");
         }
+    }
+    
+    for (auto stat : stats) {
+        printf("%d %d %d %d/%d %0.2f %% \n", stat.rec.freq, stat.rec.group, stat.rec.cc, stat.cnt_suc, stat.cnt, 1.0*stat.cnt_suc/stat.cnt*100);
     }
     
     

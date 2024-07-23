@@ -154,7 +154,9 @@ int main(int argc, char **argv) {
     bool output_dumps = false;
     bool output_records = false;
     
-    while ((c = getopt(argc, argv, "v:hk:d:K:o:")) != -1) {
+    int error = 0;
+    
+    while ((c = getopt(argc, argv, "v:hk:d:K:o:e:f:")) != -1) {
         switch (c) {
             case 'v':
                 print_dumps = stoi(optarg);
@@ -173,6 +175,9 @@ int main(int argc, char **argv) {
                 out_file = optarg;
                 output_dumps = true;
                 break;
+            case 'e':
+                error = stoi(optarg);
+                break;
             case 'h':
                 printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
                 return 0;
@@ -183,7 +188,7 @@ int main(int argc, char **argv) {
     }
     
     if (*keys_file == 0 || *dumps_file == 0) {
-        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
+        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error\n");
         return 0;
     }
     
@@ -316,7 +321,6 @@ int main(int argc, char **argv) {
             md680_make_key(key, iv);
             md680_decrypt_alg1(to_decrypt_cp, 16);
             
-            int cnt = 0;
             int diff = 0;
             
             for (int i=0;i<3;i++) {
@@ -325,12 +329,8 @@ int main(int argc, char **argv) {
                     ((to_decrypt_cp[i*5+2] & 0xcc) <<  8) |
                     ((to_decrypt_cp[i*5+3] & 0x88))       |
                     ((to_decrypt_cp[i*5+4] & 0x88) >>  1);
-                if (v == target) {
-                    ++cnt;
-                }
-                if (print_dumps) {
-                    diff +=  __builtin_popcountl(v^target);
-                }
+                
+                diff +=  __builtin_popcountl(v^target);
             }
             
             if (print_dumps == 1 and diff < min_diff) {
@@ -339,7 +339,7 @@ int main(int argc, char **argv) {
                 best_key = key;
             }
             
-            if (cnt == 3) {
+            if (diff <= error) {
                 successful_decrypt = true;
                 
                 rec.key = key;

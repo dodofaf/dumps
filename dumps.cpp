@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <сstring>
+#include <cstring>
 #include <cstdint>
 #include <fstream>
 #include <sstream>
@@ -147,9 +147,9 @@ int main(int argc, char **argv) {
     int print_dumps = false;
     
     char* keys_file = "";
-    char* rec_file = "keys.txt";
+    char* rec_file = "";
     char* dumps_file = "";
-    char* out_file = "dump.txt";
+    char* out_file = "";
     
     bool output_dumps = false;
     bool output_records = false;
@@ -187,32 +187,34 @@ int main(int argc, char **argv) {
         return 0;
     }
     
-    
-    fstream records_in(rec_file, records_in.in);
     vector<Record> records;
     string line;
-    while (getline(records_in, line)) {
-        if (line.empty()) {
-            continue;
+    
+    if (output_records) {
+        fstream records_in(rec_file, records_in.in);
+        while (getline(records_in, line)) {
+            if (line.empty()) {
+                continue;
+            }
+            
+            Record rec;
+            
+            int found = line.find_first_of(" ");
+            rec.freq = stoi(line.substr(0, found));
+            
+            found = line.find_first_of(" ",found+1);
+            found = line.find_first_of(" ",found+1);
+            
+            rec.group = stoi(line.substr(found+1, line.find_first_of(" ",found+1)-found-1));
+            found = line.find_first_of(" ",found+1);
+            
+            rec.cc = stoi(line.substr(found+1, line.find_first_of(" ",found+1)-found-1));
+            found = line.find_first_of(" ",found+1);
+            
+            rec.key = trans(line.substr(found+1));
+            
+            records.push_back(rec);
         }
-        
-        Record rec;
-        
-        int found = line.find_first_of(" ");
-        rec.freq = stoi(line.substr(0, found));
-        
-        found = line.find_first_of(" ",found+1);
-        found = line.find_first_of(" ",found+1);
-        
-        rec.group = stoi(line.substr(found+1, line.find_first_of(" ",found+1)-found-1));
-        found = line.find_first_of(" ",found+1);
-        
-        rec.cc = stoi(line.substr(found+1, line.find_first_of(" ",found+1)-found-1));
-        found = line.find_first_of(" ",found+1);
-        
-        rec.key = trans(line.substr(found+1));
-        
-        records.push_back(rec);
     }
     
     compute_tabular_method_tables_reverse(g_tbl_R, 12);
@@ -223,9 +225,14 @@ int main(int argc, char **argv) {
         keys.push_back(trans(line));
     }
     
-
-    FILE * records_file = fopen(rec_file, "a");
-    FILE * output_file = fopen(out_file, "a");
+    
+    FILE * records_file;
+    FILE * output_file;
+    
+    if (output_records)
+        records_file = fopen(rec_file, "a");
+    if (output_dumps)
+        output_file = fopen(out_file, "a");
     
     fstream dump_in(dumps_file, dump_in.in);
     

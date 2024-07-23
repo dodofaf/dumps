@@ -155,6 +155,7 @@ int main(int argc, char **argv) {
     bool output_records = false;
     
     int error = 0;
+    int freq = -1;
     
     while ((c = getopt(argc, argv, "v:hk:d:K:o:e:f:")) != -1) {
         switch (c) {
@@ -178,6 +179,9 @@ int main(int argc, char **argv) {
             case 'e':
                 error = stoi(optarg);
                 break;
+            case 'f':
+                freq = stoi(optarg);
+                break;
             case 'h':
                 printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
                 return 0;
@@ -188,7 +192,7 @@ int main(int argc, char **argv) {
     }
     
     if (*keys_file == 0 || *dumps_file == 0) {
-        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error\n");
+        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error -f frequency\n");
         return 0;
     }
     
@@ -218,7 +222,8 @@ int main(int argc, char **argv) {
             
             rec.key = trans(line.substr(found+1));
             
-            records.push_back(rec);
+            if (freq == -1 || freq == rec.freq)
+                records.push_back(rec);
         }
     }
     
@@ -277,6 +282,9 @@ int main(int argc, char **argv) {
         vector<uint8_t> tmp = trans(line);
         for (int i=0;i<27;++i)
             dump[i] = tmp[i];
+        
+        if (freq == -1 || freq != rec.freq)
+            continue;
         
         int type;
         

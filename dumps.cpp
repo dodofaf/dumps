@@ -211,10 +211,10 @@ int main(int argc, char **argv) {
             int found = line.find_first_of(" ");
             rec.freq = stoi(line.substr(0, found));
             
-            found = line.find_first_of(" ",found+1);
-            
             if (line.substr(found+1, line.find_first_of(" ",found+1)-found-1) != "44")
                 continue;
+            
+            found = line.find_first_of(" ",found+1);
             
             found = line.find_first_of(" ",found+1);
             

@@ -212,6 +212,10 @@ int main(int argc, char **argv) {
             rec.freq = stoi(line.substr(0, found));
             
             found = line.find_first_of(" ",found+1);
+            
+            if (line.substr(found+1, line.find_first_of(" ",found+1)-found-1) != "44")
+                continue;
+            
             found = line.find_first_of(" ",found+1);
             
             rec.group = stoi(line.substr(found+1, line.find_first_of(" ",found+1)-found-1));
@@ -283,7 +287,7 @@ int main(int argc, char **argv) {
         for (int i=0;i<27;++i)
             dump[i] = tmp[i];
         
-        if (freq == -1 || freq != rec.freq)
+        if (freq != -1 and freq != rec.freq)
             continue;
         
         int type;

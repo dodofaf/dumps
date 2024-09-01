@@ -6,6 +6,10 @@
 #include <fstream>
 #include <sstream>
 #include <unistd.h>
+#include <map>
+#include <list>
+#include <utility>
+#include <iterator>
 
 using namespace std;
 
@@ -146,34 +150,50 @@ int main(int argc, char **argv) {
     
     int print_dumps = false;
     
-    char* keys_file = "";
-    char* rec_file = "";
-    char* dumps_file = "";
-    char* out_file = "";
+    FILE * records_file;
+    FILE * output_file;
+    FILE * best_dumps_file;
+    
+    fstream records_in;
+    fstream dump_in;
+    fstream keys_in;
     
     bool output_dumps = false;
     bool output_records = false;
+    bool output_best_dumps = false;
+    
+    bool keys_in_exist = false;
+    bool dumps_in_exist = false;
     
     int error = 0;
     int freq = -1;
     
-    while ((c = getopt(argc, argv, "v:hk:d:K:o:e:f:")) != -1) {
+    while ((c = getopt(argc, argv, "v:hk:d:K:o:e:f:b:")) != -1) {
         switch (c) {
             case 'v':
                 print_dumps = stoi(optarg);
                 break;
             case 'k':
-                keys_file = optarg;
+                keys_in = fstream(optarg, keys_in.in);
+                if (fopen(optarg, "r") != NULL)
+                    keys_in_exist = true;
+                else
+                    printf("file %s doesn't exist\n", optarg);
                 break;
             case 'd':
-                dumps_file = optarg;
+                dump_in = fstream(optarg, dump_in.in);
+                if (fopen(optarg, "r") != NULL)
+                    dumps_in_exist = true;
+                else
+                    printf("file %s doesn't exist\n", optarg);
                 break;
             case 'K':
-                rec_file = optarg;
+                records_file = fopen(optarg, "a");
+                records_in = fstream(optarg, records_in.in);
                 output_records = true;
                 break;
             case 'o':
-                out_file = optarg;
+                output_file = fopen(optarg, "a");
                 output_dumps = true;
                 break;
             case 'e':
@@ -182,8 +202,12 @@ int main(int argc, char **argv) {
             case 'f':
                 freq = stoi(optarg);
                 break;
+            case 'b':
+                best_dumps_file = fopen(optarg, "a");
+                output_best_dumps = true;
+                break;
             case 'h':
-                printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse\n");
+                printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error -f frequency -b best_dumps_out\n");
                 return 0;
                 break;
             default:
@@ -191,8 +215,8 @@ int main(int argc, char **argv) {
         }
     }
     
-    if (*keys_file == 0 || *dumps_file == 0) {
-        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error -f frequency\n");
+    if (!keys_in_exist || !dumps_in_exist) {
+        printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error -f frequency -b best_dumps_out\n");
         return 0;
     }
     
@@ -200,7 +224,6 @@ int main(int argc, char **argv) {
     string line;
     
     if (output_records) {
-        fstream records_in(rec_file, records_in.in);
         while (getline(records_in, line)) {
             if (line.empty()) {
                 continue;
@@ -234,24 +257,15 @@ int main(int argc, char **argv) {
     compute_tabular_method_tables_reverse(g_tbl_R, 12);
     vector<vector<uint8_t> > keys;
     
-    fstream keys_in(keys_file, keys_in.in);
+    
     while (getline(keys_in, line)) {
         keys.push_back(trans(line));
     }
     
     
-    FILE * records_file;
-    FILE * output_file;
-    
-    if (output_records)
-        records_file = fopen(rec_file, "a");
-    if (output_dumps)
-        output_file = fopen(out_file, "a");
-    
-    fstream dump_in(dumps_file, dump_in.in);
-    
-    
     vector<Stat> stats;
+    
+    map<pair<uint32_t, vector<uint8_t>>, list<vector<uint8_t>>> dumps_by_freq_and_iv;
     
     int cnt = 0;
     
@@ -289,6 +303,10 @@ int main(int argc, char **argv) {
         
         if (freq != -1 and freq != rec.freq)
             continue;
+        
+        if (output_best_dumps) {
+            dumps_by_freq_and_iv[make_pair(rec.freq, iv)].push_back(tmp);
+        }
         
         int type;
         
@@ -425,6 +443,50 @@ int main(int argc, char **argv) {
     
     for (auto stat : stats) {
         printf("%d %d %d %d/%d %0.2f %% \n", stat.rec.freq, stat.rec.group, stat.rec.cc, stat.cnt_suc, stat.cnt, 1.0*stat.cnt_suc/stat.cnt*100);
+    }
+    
+    if (output_best_dumps) {
+        for (auto x : dumps_by_freq_and_iv) {
+            int mx = 0;
+            vector<uint8_t> best_dump(27);
+            for (auto dump : x.second) {
+                int cnt = 0;
+                for (auto dump2 : x.second) {
+                    bool flag = true;
+                    for (int i=0;i<=4;++i)
+                        if (dump[i] != dump2[i])
+                            flag = false;
+                    cnt += flag;
+                    
+                    flag = true;
+                    for (int i=9;i<=14;++i)
+                        if (dump[i] != dump2[i])
+                            flag = false;
+                    cnt += flag;
+                    
+                    flag = true;
+                    for (int i=18;i<=22;++i)
+                        if (dump[i] != dump2[i])
+                            flag = false;
+                    cnt += flag;
+                }
+                
+                if (cnt>mx) {
+                    mx = cnt;
+                    best_dump = dump;
+                }
+            }
+            
+            fprintf(best_dumps_file, "%d ", x.first.first);
+            
+            for (auto el : x.first.second)
+                fprintf(best_dumps_file, "%02X", el);
+            fprintf(best_dumps_file, " ");
+            
+            for (auto el : best_dump)
+                fprintf(best_dumps_file, "%02X", el);
+            fprintf(best_dumps_file, " %d\n", mx);
+        }
     }
     
     

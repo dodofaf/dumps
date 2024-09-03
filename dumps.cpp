@@ -456,15 +456,9 @@ int main(int argc, char **argv) {
                     for (int i=0;i<=4;++i)
                         if (dump[i] != dump2[i])
                             flag = false;
-                    cnt += flag;
-                    
-                    flag = true;
                     for (int i=9;i<=14;++i)
                         if (dump[i] != dump2[i])
                             flag = false;
-                    cnt += flag;
-                    
-                    flag = true;
                     for (int i=18;i<=22;++i)
                         if (dump[i] != dump2[i])
                             flag = false;
@@ -485,7 +479,7 @@ int main(int argc, char **argv) {
             
             for (auto el : best_dump)
                 fprintf(best_dumps_file, "%02X", el);
-            fprintf(best_dumps_file, " %d\n", mx);
+            fprintf(best_dumps_file, " %d\n", mx-1);
         }
     }
     

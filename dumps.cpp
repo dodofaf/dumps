@@ -453,15 +453,22 @@ int main(int argc, char **argv) {
                 int cnt = 0;
                 for (auto dump2 : x.second) {
                     bool flag = true;
-                    for (int i=0;i<=4;++i)
-                        if (dump[i] != dump2[i])
+                    for (int i=0;i<3;i++) {
+                        uint32_t v1 = ((dump[i*9+0] & 0xcc) << 24) |
+                            ((dump[i*9+1] & 0xcc) << 16) |
+                            ((dump[i*9+2] & 0xcc) <<  8) |
+                            ((dump[i*9+3] & 0x88))       |
+                            ((dump[i*9+4] & 0x88) >>  1);
+                        
+                        uint32_t v2 = ((dump2[i*9+0] & 0xcc) << 24) |
+                            ((dump2[i*9+1] & 0xcc) << 16) |
+                            ((dump2[i*9+2] & 0xcc) <<  8) |
+                            ((dump2[i*9+3] & 0x88))       |
+                            ((dump2[i*9+4] & 0x88) >>  1);
+                        
+                        if (v1 != v2)
                             flag = false;
-                    for (int i=9;i<=14;++i)
-                        if (dump[i] != dump2[i])
-                            flag = false;
-                    for (int i=18;i<=22;++i)
-                        if (dump[i] != dump2[i])
-                            flag = false;
+                    }
                     cnt += flag;
                 }
                 

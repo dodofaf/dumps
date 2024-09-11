@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
         }
     }
     
-    if (!keys_in_exist || !dumps_in_exist) {
+    if ((!keys_in_exist && !output_best_dumps) || !dumps_in_exist) {
         printf("Usage: dumps -d dumps_in -o dumps_out -k dictionary -K keys_out -v verbouse -e error -f frequency -b best_dumps_out\n");
         return 0;
     }
@@ -255,17 +255,20 @@ int main(int argc, char **argv) {
     }
     
     compute_tabular_method_tables_reverse(g_tbl_R, 12);
+    
+    
     vector<vector<uint8_t> > keys;
     
-    
-    while (getline(keys_in, line)) {
-        keys.push_back(trans(line));
+    if (keys_in_exist) {
+        while (getline(keys_in, line)) {
+            keys.push_back(trans(line));
+        }
     }
     
     
     vector<Stat> stats;
     
-    map<pair<uint32_t, vector<uint8_t>>, list<vector<uint8_t>>> dumps_by_freq_and_iv;
+    map< pair< pair< uint32_t, vector<uint8_t> >, vector<uint32_t> >, pair< vector<uint8_t >, uint32_t > > dumps_by_freq_and_iv;
     
     int cnt = 0;
     
@@ -305,7 +308,19 @@ int main(int argc, char **argv) {
             continue;
         
         if (output_best_dumps) {
-            dumps_by_freq_and_iv[make_pair(rec.freq, iv)].push_back(tmp);
+            vector<uint32_t> v(3);
+            for (int i=0;i<3;++i) {
+                v[i] = ((dump[i*9+0] & 0xcc) << 24) |
+                    ((dump[i*9+1] & 0xcc) << 16) |
+                    ((dump[i*9+2] & 0xcc) <<  8) |
+                    ((dump[i*9+3] & 0x88))       |
+                    ((dump[i*9+4] & 0x88) >>  1);
+            }
+            if (dumps_by_freq_and_iv.find(make_pair(make_pair(rec.freq, iv), v)) == dumps_by_freq_and_iv.end()) {
+                dumps_by_freq_and_iv[make_pair(make_pair(rec.freq, iv), v)] = make_pair(tmp, 0);
+            } else {
+                dumps_by_freq_and_iv[make_pair(make_pair(rec.freq, iv), v)].second++;
+            }
         }
         
         int type;
@@ -441,52 +456,23 @@ int main(int argc, char **argv) {
         }
     }
     
-    for (auto stat : stats) {
-        printf("%d %d %d %d/%d %0.2f %% \n", stat.rec.freq, stat.rec.group, stat.rec.cc, stat.cnt_suc, stat.cnt, 1.0*stat.cnt_suc/stat.cnt*100);
+    if (keys_in_exist) {
+        for (auto stat : stats) {
+            printf("%d %d %d %d/%d %0.2f %% \n", stat.rec.freq, stat.rec.group, stat.rec.cc, stat.cnt_suc, stat.cnt, 1.0*stat.cnt_suc/stat.cnt*100);
+        }
     }
     
     if (output_best_dumps) {
         for (auto x : dumps_by_freq_and_iv) {
-            int mx = 0;
-            vector<uint8_t> best_dump(27);
-            for (auto dump : x.second) {
-                int cnt = 0;
-                for (auto dump2 : x.second) {
-                    bool flag = true;
-                    for (int i=0;i<3;i++) {
-                        uint32_t v1 = ((dump[i*9+0] & 0xcc) << 24) |
-                            ((dump[i*9+1] & 0xcc) << 16) |
-                            ((dump[i*9+2] & 0xcc) <<  8) |
-                            ((dump[i*9+3] & 0x88))       |
-                            ((dump[i*9+4] & 0x88) >>  1);
-                        
-                        uint32_t v2 = ((dump2[i*9+0] & 0xcc) << 24) |
-                            ((dump2[i*9+1] & 0xcc) << 16) |
-                            ((dump2[i*9+2] & 0xcc) <<  8) |
-                            ((dump2[i*9+3] & 0x88))       |
-                            ((dump2[i*9+4] & 0x88) >>  1);
-                        
-                        if (v1 != v2)
-                            flag = false;
-                    }
-                    cnt += flag;
-                }
-                
-                if (cnt>mx) {
-                    mx = cnt;
-                    best_dump = dump;
-                }
-            }
+            fprintf(best_dumps_file, "%d ", x.first.first.first);
             
-            fprintf(best_dumps_file, "%d ", x.first.first);
-            
-            for (auto el : x.first.second)
+            for (auto el : x.first.first.second)
                 fprintf(best_dumps_file, "%02X", el);
             fprintf(best_dumps_file, " ");
             
-            for (auto el : best_dump)
+            for (auto el : x.second.first)
                 fprintf(best_dumps_file, "%02X", el);
-            fprintf(best_dumps_file, " %d\n", mx-1);
+            fprintf(best_dumps_file, " %d\n", x.second.second);
         }
     }
     
